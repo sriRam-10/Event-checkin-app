@@ -30,19 +30,26 @@ interface LoginResponse {
   };
 }
 
+interface LoginVariables {
+  email: string;
+}
+
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const { setToken } = useAuth();
   const navigation = useNavigation();
 
-  const mutation = useMutation<LoginResponse>({
-    mutationFn: async () => {
+  const mutation = useMutation<LoginResponse, Error, LoginVariables>({
+    mutationFn: async (variables) => {
       const client = getClient();
-      return client.request<LoginResponse>(LOGIN_MUTATION, { email });
+      return client.request<LoginResponse>(LOGIN_MUTATION, variables);
     },
     onSuccess: (data) => {
       setToken(data.login.token);
       navigation.navigate("Events" as never);
+    },
+    onError: (error) => {
+      console.error("Login failed:", error.message);
     },
   });
 
@@ -60,7 +67,7 @@ export default function LoginScreen() {
 
       <Button
         title={mutation.isPending ? "Logging in..." : "Login"}
-        onPress={() => mutation.mutate()}
+        onPress={() => mutation.mutate({ email })}
         disabled={mutation.isPending}
       />
 

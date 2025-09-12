@@ -1,105 +1,64 @@
 import React from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { gql } from "graphql-request";
-import { getClient } from "@lib/graphqlClient";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "@navigation/AppNavigator";
+import { getClient } from "../lib/graphqlClient";
 
 const EVENTS_QUERY = gql`
-  query Events {
+  query {
     events {
       id
-      title
-      description
+      name
+      location
       date
+      attendees {
+        id
+      }
     }
   }
 `;
 
 interface Event {
   id: string;
-  title: string;
-  description?: string;
+  name: string;
+  location: string;
   date: string;
+  attendees: { id: string }[];
 }
-
-interface EventsResponse {
-  events: Event[];
-}
-
-type EventsScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "Events"
->;
 
 export default function EventListScreen() {
-  const navigation = useNavigation<EventsScreenNavigationProp>();
-
-  const { data, isLoading, isError } = useQuery<EventsResponse>({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["events"],
     queryFn: async () => {
       const client = getClient();
-      return client.request<EventsResponse>(EVENTS_QUERY);
+      return client.request<{ events: Event[] }>(EVENTS_QUERY);
     },
   });
 
-  if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text>Loading events...</Text>
-      </View>
-    );
-  }
-
-  if (isError || !data) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.error}>Failed to load events</Text>
-      </View>
-    );
-  }
+  if (isLoading) return <ActivityIndicator style={{ flex: 1 }} size="large" />;
+  if (error) return <Text style={styles.error}>Failed to load events</Text>;
 
   return (
-    <FlatList
-      data={data.events}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigation.navigate("EventDetail", { id: item.id })}
-        >
-          <Text style={styles.title}>{item.title}</Text>
-          <Text>{item.description}</Text>
-          <Text style={styles.date}>
-            {new Date(item.date).toLocaleDateString()}
-          </Text>
-        </TouchableOpacity>
-      )}
-      contentContainerStyle={styles.list}
-    />
+    <View style={styles.container}>
+      <FlatList
+        data={data?.events || []}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.title}>{item.name}</Text>
+            <Text>{item.location}</Text>
+            <Text>{new Date(item.date).toLocaleString()}</Text>
+            <Text>Attendees: {item.attendees.length}</Text>
+          </View>
+        )}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16 },
-  card: {
-    backgroundColor: "#f5f5f5",
-    padding: 16,
-    marginBottom: 12,
-    borderRadius: 8,
-  },
-  title: { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
-  date: { fontSize: 12, color: "#666", marginTop: 4 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  error: { color: "red" },
+  container: { flex: 1, padding: 20 },
+  card: { padding: 15, borderWidth: 1, borderRadius: 8, marginBottom: 10 },
+  title: { fontSize: 18, fontWeight: "bold" },
+  error: { color: "red", textAlign: "center", marginTop: 20 },
 });

@@ -17,9 +17,9 @@ const EVENT_QUERY = gql`
   query Event($id: ID!) {
     event(id: $id) {
       id
-      title
-      description
-      date
+      name
+      location
+      startTime
       attendees {
         id
         email
@@ -36,6 +36,7 @@ const CHECKIN_MUTATION = gql`
       attendees {
         id
         email
+        name
       }
     }
   }
@@ -49,9 +50,9 @@ interface User {
 
 interface Event {
   id: string;
-  title: string;
-  description?: string;
-  date: string;
+  name: string;
+  location?: string;
+  startTime: string;
   attendees: User[];
 }
 
@@ -111,10 +112,10 @@ export default function EventDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{event.title}</Text>
-      <Text style={styles.desc}>{event.description}</Text>
+      <Text style={styles.title}>{event.name}</Text>
+      <Text style={styles.desc}>{event.location}</Text>
       <Text style={styles.date}>
-        {new Date(event.date).toLocaleDateString()}
+        {new Date(event.startTime).toLocaleString()}
       </Text>
 
       <Text style={styles.section}>Attendees:</Text>

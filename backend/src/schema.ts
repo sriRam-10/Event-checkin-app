@@ -9,8 +9,8 @@ export const typeDefs = gql`
 
   type Event {
     id: ID!
-    title: String!
-    description: String
+    name: String!
+    location: String!
     date: String!
     attendees: [User!]!
   }
