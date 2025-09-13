@@ -8,10 +8,10 @@ import {
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { gql } from "graphql-request";
-import { getClient } from "@lib/graphqlClient";
+import { getClient } from "../lib/graphqlClient";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
-import type { RootStackParamList } from "@navigation/AppNavigator";
+import type { RootStackParamList } from "../navigation/AppNavigator";
 
 const EVENT_QUERY = gql`
   query Event($id: ID!) {
@@ -19,7 +19,7 @@ const EVENT_QUERY = gql`
       id
       name
       location
-      startTime
+      date
       attendees {
         id
         email
@@ -52,7 +52,7 @@ interface Event {
   id: string;
   name: string;
   location?: string;
-  startTime: string;
+  date?: string;
   attendees: User[];
 }
 
@@ -71,6 +71,7 @@ export default function EventDetailScreen() {
   const { id } = route.params;
   const queryClient = useQueryClient();
 
+  // ✅ Fetch event details
   const { data, isLoading, isError } = useQuery<EventResponse>({
     queryKey: ["event", id],
     queryFn: async () => {
@@ -79,6 +80,7 @@ export default function EventDetailScreen() {
     },
   });
 
+  // ✅ Mutation for check-in
   const mutation = useMutation<CheckInResponse>({
     mutationFn: async () => {
       const client = getClient();
@@ -87,6 +89,7 @@ export default function EventDetailScreen() {
       });
     },
     onSuccess: () => {
+      // ✅ Refresh event query so attendees update
       queryClient.invalidateQueries({ queryKey: ["event", id] });
     },
   });
@@ -113,9 +116,9 @@ export default function EventDetailScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{event.name}</Text>
-      <Text style={styles.desc}>{event.location}</Text>
+      <Text style={styles.desc}>{event.location || "No location"}</Text>
       <Text style={styles.date}>
-        {new Date(event.startTime).toLocaleString()}
+        {event.date ? new Date(event.date).toLocaleDateString() : "No date set"}
       </Text>
 
       <Text style={styles.section}>Attendees:</Text>

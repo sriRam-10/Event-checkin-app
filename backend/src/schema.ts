@@ -11,7 +11,7 @@ export const typeDefs = gql`
     id: ID!
     name: String!
     location: String!
-    date: String!
+    date: String
     attendees: [User!]!
   }
 

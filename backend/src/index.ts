@@ -18,8 +18,8 @@ app.use(cors());
 const httpServer = http.createServer(app);
 
 // ✅ Setup Socket.io
-const io = new Server(httpServer, { 
-  cors: { origin: "*" } 
+const io = new Server(httpServer, {
+  cors: { origin: "*" },
 });
 
 // ✅ Apollo Server setup
@@ -27,8 +27,14 @@ const server = new ApolloServer({
   typeDefs,
   resolvers,
   context: ({ req }) => {
-    const token = req.headers.authorization || "";
-    const user = getUserFromToken(token);
+    const authHeader = req.headers.authorization || "";
+
+    let user = null;
+    if (authHeader.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", ""); // strip here
+      user = getUserFromToken(token); // pass clean token
+    }
+
     return { prisma, io, user };
   },
 });
@@ -38,7 +44,7 @@ async function startServer() {
     await server.start();
 
     // ✅ Attach Apollo middleware to Express
-   server.applyMiddleware({ app: app as any });
+    server.applyMiddleware({ app: app as any });
 
     // ✅ Socket.io connection
     io.on("connection", (socket) => {
