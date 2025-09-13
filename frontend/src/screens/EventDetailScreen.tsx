@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { getClient } from "../lib/graphqlClient";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import io from "socket.io-client";
 
 const EVENT_QUERY = gql`
   query Event($id: ID!) {
@@ -36,7 +37,6 @@ const CHECKIN_MUTATION = gql`
       attendees {
         id
         email
-        name
       }
     }
   }
@@ -51,8 +51,8 @@ interface User {
 interface Event {
   id: string;
   name: string;
-  location?: string;
-  date?: string;
+  location: string;
+  date: string;
   attendees: User[];
 }
 
@@ -71,7 +71,6 @@ export default function EventDetailScreen() {
   const { id } = route.params;
   const queryClient = useQueryClient();
 
-  // ✅ Fetch event details
   const { data, isLoading, isError } = useQuery<EventResponse>({
     queryKey: ["event", id],
     queryFn: async () => {
@@ -80,19 +79,30 @@ export default function EventDetailScreen() {
     },
   });
 
-  // ✅ Mutation for check-in
   const mutation = useMutation<CheckInResponse>({
     mutationFn: async () => {
       const client = getClient();
-      return client.request<CheckInResponse>(CHECKIN_MUTATION, {
-        eventId: id,
-      });
+      return client.request<CheckInResponse>(CHECKIN_MUTATION, { eventId: id });
     },
     onSuccess: () => {
-      // ✅ Refresh event query so attendees update
       queryClient.invalidateQueries({ queryKey: ["event", id] });
     },
   });
+
+  // ✅ Real-time updates with Socket.IO
+  useEffect(() => {
+    const socket = io("http://localhost:4000");
+
+    socket.on("eventUpdated", (updatedEvent: Event) => {
+      if (updatedEvent.id === id) {
+        queryClient.setQueryData(["event", id], { event: updatedEvent });
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [id, queryClient]);
 
   if (isLoading) {
     return (
@@ -116,10 +126,8 @@ export default function EventDetailScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{event.name}</Text>
-      <Text style={styles.desc}>{event.location || "No location"}</Text>
-      <Text style={styles.date}>
-        {event.date ? new Date(event.date).toLocaleDateString() : "No date set"}
-      </Text>
+      <Text>{event.location}</Text>
+      <Text>{new Date(event.date).toLocaleDateString()}</Text>
 
       <Text style={styles.section}>Attendees:</Text>
       {event.attendees.length > 0 ? (
@@ -146,8 +154,6 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
   title: { fontSize: 22, fontWeight: "bold", marginBottom: 8 },
-  desc: { fontSize: 16, marginBottom: 8 },
-  date: { fontSize: 14, color: "#666", marginBottom: 16 },
   section: { fontSize: 18, marginTop: 16, marginBottom: 8 },
   button: { marginTop: 20 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },

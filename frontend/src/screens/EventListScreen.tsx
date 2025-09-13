@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -6,13 +6,16 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Button,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { gql } from "graphql-request";
 import { getClient } from "../lib/graphqlClient";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import { useAuth } from "../hooks/useAuth";
+import io from "socket.io-client";
 
 const EVENTS_QUERY = gql`
   query {
@@ -43,6 +46,8 @@ type EventsScreenNavigationProp = StackNavigationProp<
 
 export default function EventListScreen() {
   const navigation = useNavigation<EventsScreenNavigationProp>();
+  const { setToken } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["events"],
@@ -51,6 +56,34 @@ export default function EventListScreen() {
       return client.request<{ events: Event[] }>(EVENTS_QUERY);
     },
   });
+
+  // ✅ Listen to real-time event updates
+  useEffect(() => {
+    const socket = io("http://localhost:4000");
+
+    socket.on("eventUpdated", (updatedEvent: Event) => {
+      console.log("📢 Event updated:", updatedEvent);
+
+      queryClient.setQueryData(["events"], (oldData: any) => {
+        if (!oldData) return { events: [updatedEvent] };
+
+        return {
+          events: oldData.events.map((ev: Event) =>
+            ev.id === updatedEvent.id ? updatedEvent : ev
+          ),
+        };
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [queryClient]);
+
+  const handleLogout = () => {
+    setToken(null);
+    navigation.navigate("Login");
+  };
 
   if (isLoading) {
     return (
@@ -71,6 +104,11 @@ export default function EventListScreen() {
 
   return (
     <View style={styles.container}>
+      {/* ✅ Logout Button */}
+      <View style={styles.logoutContainer}>
+        <Button title="Logout" onPress={handleLogout} />
+      </View>
+
       <FlatList
         data={data?.events || []}
         keyExtractor={(item) => item.id}
@@ -94,6 +132,10 @@ export default function EventListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
+  logoutContainer: {
+    alignItems: "flex-end",
+    marginBottom: 10,
+  },
   card: {
     padding: 15,
     borderWidth: 1,

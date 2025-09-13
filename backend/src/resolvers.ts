@@ -32,7 +32,6 @@ export const resolvers = {
       let user = await prisma.user.findUnique({ where: { email } });
 
       if (!user) {
-        // Auto-create user if not exists
         user = await prisma.user.create({
           data: { email, name: email.split("@")[0] },
         });
@@ -42,25 +41,24 @@ export const resolvers = {
       return { token, user };
     },
 
-    checkIn: async (_: any, { eventId }: { eventId: string }, { user }: any) => {
+    checkIn: async (_: any, { eventId }: { eventId: string }, { user, io }: any) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Ensure user exists
       const existingUser = await prisma.user.findUnique({ where: { id: user.id } });
       if (!existingUser) throw new Error("User not found");
 
-      // Connect the user to event attendees
-      await prisma.event.update({
+      const updatedEvent = await prisma.event.update({
         where: { id: eventId },
         data: {
           attendees: { connect: { id: user.id } },
         },
-      });
-
-      return prisma.event.findUnique({
-        where: { id: eventId },
         include: { attendees: true },
       });
+
+      // ✅ Emit a real-time update to all clients
+      io.emit("eventUpdated", updatedEvent);
+
+      return updatedEvent;
     },
   },
 };
